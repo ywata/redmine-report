@@ -14,10 +14,10 @@ import Debug.Trace (trace)
 data Marker = Marker{mark::T.Text, space:: T.Text, width::Int}
               deriving(Show, Eq)
 
-reportMark    = Marker "--" ""   2 :: Marker -- This mark appears in a journal(=  history) data.
-updatedMarker = Marker "* " "  " 2 :: Marker
-l1Marker      = Marker "-"  " "  1 :: Marker
-l2Marker      = Marker "+"  " "  1 :: Marker
+reportMark    = Marker "--" ""   2 :: Marker -- This mark specifies the journal to be appeared in the report
+updatedMarker = Marker "* " "  " 2 :: Marker -- This marker is added for updated information during a specified period.
+--l1Marker      = Marker "-"  " "  1 :: Marker -- This marker is a mark for the first level indent.
+--l2Marker      = Marker "+"  " "  1 :: Marker -- This marker is a mark for the second level indent.
 
 l2Mark = "+" : repeat " "
 
@@ -25,51 +25,61 @@ indent = 2
 
 text = PP.text . T.unpack
 newtype Group a = Group{group :: a} deriving(Show, Eq)
-class ToDoc a where
-  toDocWith :: (Bool -> PP.Doc -> PP.Doc) -> (Maybe UTCTime) -> (Maybe UTCTime) ->  a -> PP.Doc
 
-toDoc from to a = toDocWith (const (\_ -> PP.empty)) from to a
+-- | Top level report generator.
+toDoc :: ToDoc a => (Maybe UTCTime) -> (Maybe UTCTime) -> a -> PP.Doc
+toDoc from to a = toDocWith (const (\_ -> PP.empty)) isBetween a
+  where
+    isBetween utc = case (from, to) of
+      (Just f, Just t) -> f <= utc && utc <= t
+      (Just f, _)      -> f <= utc
+      (_,      Just t) -> utc <= t
+      (_, _)           -> True      
+
+
+-- | Type class for generating report.
+class ToDoc a where
+--  toDocWith :: (Bool -> PP.Doc -> PP.Doc) -> (Maybe UTCTime) -> (Maybe UTCTime) ->  a -> PP.Doc
+  toDocWith :: (Bool -> PP.Doc -> PP.Doc) -> (UTCTime -> Bool) ->  a -> PP.Doc
+
 instance ToDoc (Group [Issue]) where
-  toDocWith _  from to  (Group is@(i:_)) = (text . name_ObjRef . tracker_Issue $ i) PP.$$
-                                    (toDocWith f from to is)
+  toDocWith _  p (Group is@(i:_)) = (text . name_ObjRef . tracker_Issue $ i) PP.$$
+                                    (toDocWith f p is)
     where
       f = \b -> (PP.<>) (text (if b then mark updatedMarker else space updatedMarker))
 
 instance ToDoc Issue where
-  toDocWith f from to i =
+  toDocWith f p i =
     (f b) ((text "-" PP.<>) . text . subject_Issue $ i) PP.<+> PP.parens (text . name_ObjRef . status_Issue $ i) PP.$$
-    (toDocWith g from to (fmap (filter needReport) $ journals_Issue i))
+    (toDocWith g p (fmap (filter needReport) $ journals_Issue i))
     where
-      b = isUpdatedBetween from to i
+      b = isUpdated p i
       g = \b -> (PP.<>) (text (if b then mark updatedMarker else space updatedMarker) PP.<> text "  ")
 
 instance ToDoc Journal where
-
-  toDocWith f from to j = PP.vcat . map (\(d, m) -> (f b) (text m PP.<> text d)) $ zip ls l2Mark
+  toDocWith f p j = PP.vcat . map (\(d, m) -> (f b) (text m PP.<> text d)) $ zip ls l2Mark
     where
-      b = isUpdatedBetween from to j
+      b = isUpdated p j
       ls = T.lines . T.drop (T.length (mark reportMark)) . T.replace "\r" "" . notes_Journal $ j
 
 instance ToDoc a => ToDoc (Maybe a) where
-  toDocWith _ _ _ Nothing      = PP.empty
-  toDocWith f from to (Just a) = toDocWith f from to a
+  toDocWith _ _ Nothing      = PP.empty
+  toDocWith f p (Just a) = toDocWith f p a
 instance ToDoc a =>ToDoc [a] where
-  toDocWith f from to = PP.vcat . map (toDocWith f from to) 
+  toDocWith f p = PP.vcat . map (toDocWith f p) 
+
 class Updated a where
   --                  from            to
-  isUpdatedBetween :: Maybe UTCTime -> Maybe UTCTime -> a -> Bool
+  isUpdated :: (UTCTime -> Bool)  -> a -> Bool
 instance Updated Journal where
-  isUpdatedBetween _          _          Journal{notes_Journal = ""}           = False
-  isUpdatedBetween (Just from) (Just to) Journal{createdOn_Journal = Just utc} = from <= utc && utc <= to
-  isUpdatedBetween (Just from) _         Journal{createdOn_Journal = Just utc} = from <= utc
-  isUpdatedBetween _           (Just to) Journal{createdOn_Journal = Just utc} = utc <= to
-  isUpdatedBetween _           _         Journal{createdOn_Journal = Just utc} = True
-  isUpdatedBetween _           _         _                                     = False
+  isUpdated _  Journal{notes_Journal = ""}           = False
+  isUpdated p  Journal{createdOn_Journal = Just utc} = p utc
+  isUpdated _  _                                     = False
 
 
 instance Updated Issue where
-  isUpdatedBetween f t Issue{journals_Issue = Just js} = or . map (isUpdatedBetween f t) $ js
-  isUpdatedBetween f t Issue{journals_Issue = _} =  False
+  isUpdated p Issue{journals_Issue = Just js} = or . map (isUpdated p ) $ js
+  isUpdated p Issue{journals_Issue = _} =  False
 
 needReport:: Journal -> Bool
 needReport (Journal{notes_Journal = n}) = T.take (T.length . mark $ reportMark) n == mark reportMark
