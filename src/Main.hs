@@ -37,13 +37,14 @@ timeExtention = "T00:00:00Z"
 
 defaultConfig = Config [] [] :: Config (String, String) String (Integer, String) Integer
 
+
+mkArgs args = case length args of
+  0 -> defaultArgs
+  _ -> take 2 $  map (\x -> (x ++ timeExtention)) args ++ repeat ""
+
 main  = do
   args' <- getArgs
-  let args = if length args' /= 2 then
-                defaultArgs
-              else
-                map ( ++ timeExtention) args'
-      [from, to] = map parseRHTime args
+  let [from, to] = map parseRHTime $ mkArgs args'
   config' <- readConfig defaultConfigFile
   let config = either (const defaultConfig) id config'
 
