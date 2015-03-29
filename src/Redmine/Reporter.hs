@@ -28,7 +28,7 @@ newtype Group a = Group{group :: a} deriving(Show, Eq)
 
 -- | Top level report generator.
 toDoc :: ToDoc a => (Maybe UTCTime) -> (Maybe UTCTime) -> a -> PP.Doc
-toDoc from to a = toDocWith (const (\_ -> PP.empty)) isBetween a
+toDoc from to = toDocWith (const (\_ -> PP.empty)) isBetween
   where
     isBetween utc = case (from, to) of
       (Just f, Just t) -> f <= utc && utc <= t
@@ -43,10 +43,11 @@ class ToDoc a where
   toDocWith :: (Bool -> PP.Doc -> PP.Doc) -> (UTCTime -> Bool) ->  a -> PP.Doc
 
 instance ToDoc (Group [Issue]) where
-  toDocWith _  p (Group is@(i:_)) = (text . name_ObjRef . tracker_Issue $ i) PP.$$
+  toDocWith _ p (Group is@(i:_)) = (text . name_ObjRef . tracker_Issue $ i) PP.$$
                                     (toDocWith f p is)
     where
       f = \b -> (PP.<>) (text (if b then mark updatedMarker else space updatedMarker))
+
 
 instance ToDoc Issue where
   toDocWith f p i =

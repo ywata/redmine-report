@@ -25,7 +25,6 @@ mkConfigMap (SectionDef n defs ords) = (n, idm, odm)
     odm = mkOrderMap ords
 
 
-
 mkIdMap::(Integral a) => [(a, b)] -> IdMap a b
 mkIdMap dfs = Map.fromList $ map (\(f, s) -> (fromIntegral f, s)) dfs
 

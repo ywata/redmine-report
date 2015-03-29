@@ -1,6 +1,10 @@
-password="bitnami"
-user="user"
+xpassword="bitnami"
+xuser="user"
+password="bitnamibitnami"
+user="ywata"
 url="http://10.0.1.11/"
+#url="http://192.168.179.3/"
+
 
 [tracker]
 "バグ"<=1

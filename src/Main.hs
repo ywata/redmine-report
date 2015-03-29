@@ -3,8 +3,10 @@ module Main where
 import Redmine.Get
 import Redmine.Manager
 import Redmine.Types
+import Redmine.Post
 import Redmine.Reporter
 import Redmine.Utils
+
 import Redmine.Reporter.Config    
 import qualified Data.Map as Map (fromList, empty, (!), lookup, Map)
 import Control.Monad.Trans.Maybe
@@ -84,4 +86,27 @@ main  = do
   case b of
     Just x -> putStrLn x
     Nothing -> putStr "failed"
+
+main0  = do
+  args' <- getArgs
+  let [from, to] = map parseRHTime $ mkArgs args'
+  config' <- readConfig defaultConfigFile
+  let config = either (const defaultConfig) id config'
+
+  let sects = sections config
+      kv    = keyValue config
+      -- FIXME: error handling. Just pass invalid information if missing. No error is reported.
+      user     = maybe "" fromString $ lookup "user" kv
+      password = maybe "" fromString $ lookup "password" kv
+      url      = maybe "" fromString $ lookup "url" kv
+
+      rm = RedmineMngWithAuth url user password
+      issue = Issue {project_Issue = ObjRef 1 "testproject", subject_Issue = "alphaabet日本語のsubjectを登録する", description_Issue = "良くわからないけど詳細の情報を登録しておく"}
+
+
+  is <- (runMaybeT $ postIssue rm issue)
+  return is
+
+
+
 
