@@ -75,7 +75,6 @@ main  = do
       (trackerIdMap, trackerOrderMap) = case cf of
         Just (_, i, o) -> (i, o)
         Nothing            -> (Map.empty, Map.empty)
-  print (pjid, trid)
 {-      issue = Issue { project_Issue = ObjRef {id_ObjRef = 1}, tracker_Issue = ObjRef 1 "",
                       subject_Issue = "This is a Test.", description_Issue = "", journals_Issue = Just []}
   is <- runMaybeT $ postIssue rm issue
@@ -83,8 +82,6 @@ main  = do
 
   is <- (runMaybeT $ getIssues rm allIssues)
   let mbiids = fmap (map id_Issue . filter (isTargetIssue pjid trid Nothing)) is
-      mbiids' = fmap (map id_Issue) is
-  print trid
   js <- case mbiids of
     Just iids -> do
          a <- mapM (\i -> runMaybeT $ getIssue rm i issueWithJournal) iids
