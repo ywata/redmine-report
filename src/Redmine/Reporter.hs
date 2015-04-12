@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances  #-}
+
 module Redmine.Reporter where
 import Redmine.Types
 import qualified Text.PrettyPrint as PP
@@ -68,6 +69,16 @@ instance ToDoc a => ToDoc (Maybe a) where
 instance ToDoc a =>ToDoc [a] where
   toDocWith f p = PP.vcat . map (toDocWith f p) 
 
+
+class DBShow a where
+  dbShow:: a -> String
+
+--instance DBShow Project where
+--  dbShow p = id_Project p PP.<> name_Project p
+
+
+
+---
 class Updated a where
   --                  from            to
   isUpdated :: (UTCTime -> Bool)  -> a -> Bool
@@ -86,6 +97,14 @@ needReport (Journal{notes_Journal = n}) = T.take (T.length . mark $ reportMark) 
 nestWithMark:: Int -> T.Text -> PP.Doc -> PP.Doc
 nestWithMark n t = undefined
 
+isTargetIssue :: Maybe [Integer] -> Maybe [Integer] -> Maybe [Integer] -> Issue -> Bool
+isTargetIssue ps ts us iss =  (maybe True (elem i) ps) && (maybe True (elem t) ts)
+  where
+    i = id_ObjRef . project_Issue $ iss
+    t = id_ObjRef . tracker_Issue $ iss
+--    a = fmap (id_ObjRef . assignedTo_Issue) iss    
+
+
 modifyIssue:: (Integral a) => IdMap a String -> Issue -> Issue
 modifyIssue m i@Issue{tracker_Issue = ti}  = i{tracker_Issue = ti'}
   where
@@ -93,3 +112,5 @@ modifyIssue m i@Issue{tracker_Issue = ti}  = i{tracker_Issue = ti'}
 
 sortIssue::[Issue] -> [Issue]
 sortIssue = undefined
+
+

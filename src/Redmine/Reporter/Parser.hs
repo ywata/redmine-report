@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
+
 module Redmine.Reporter.Parser (readConfig) where
 import Control.Applicative ((<|>), (<$>), (<*>), (*>), (<*))
 import Text.Parsec      (Parsec, ParseError, many, many1, char,  noneOf, oneOf, parse, string, try, alphaNum, letter)
@@ -17,9 +18,8 @@ import Redmine.Reporter.Config
 
 import Debug.Trace (trace)
 
-
 ---------- Below are parser
-readConfig :: String -> IO(Either ParseError (Config (String, String) String (Integer, String) Integer))
+readConfig :: String -> IO(Either ParseError (Config (String, String) String (Integer, String) Integer (String, [Integer])))
 readConfig f = parseFromFile config f
 
 langDef::P.LanguageDef ()
@@ -33,9 +33,10 @@ langDef = P.LanguageDef{
   , P.opStart = oneOf "=<"
   , P.opLetter = oneOf ""
   , P.reservedNames = []
-  , P.reservedOpNames = ["=", "<", "<="]
+  , P.reservedOpNames = ["=", "<", "<=", ","]
   , P.caseSensitive = True
   }
+
 
 lexer = P.makeTokenParser langDef
 brackets = P.brackets lexer
@@ -45,8 +46,13 @@ parens = P.parens lexer
 reservedOp = P.reservedOp lexer
 strLiteral = P.stringLiteral lexer
 
-
 keyVal = (,) <$> ident <* reservedOp "=" <*> strLiteral
+keyIds = (,) <$> ident <* reservedOp "=" <*> parens kid
+  where
+    kid = do
+      n <- natural
+      ns <- many ( reservedOp "," *> natural)
+      return $ n:ns
 
 order = (:) <$> natural <*> (many1 r)
   where
@@ -55,7 +61,7 @@ order = (:) <$> natural <*> (many1 r)
 def = (flip (,)) <$> strLiteral <* reservedOp "<=" <*> natural
 
 sectionName = brackets ident
-sectionDef = SectionDef <$> sectionName <*> many def <*> many order
+sectionDef = SectionDef <$> sectionName <*> many keyIds <*> many def <*> many order
 
 config = Config <$> many keyVal <*> many sectionDef
 
@@ -77,5 +83,9 @@ kv2 = parse (keyVal) "" " a=\"bc\""
 
 f1 = parse (parens P.letter) "" "()"
 f2 = parse (parens P.letter) "" "(b)"
+
+g1 = parse keyIds "" "test = (1,2,3 )"
+g2 = parse keyIds "" "test = (1)"
 -}
+
 

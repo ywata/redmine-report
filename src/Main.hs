@@ -1,41 +1,49 @@
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE OverloadedStrings #-}
+
+--{-# OPTIONS_GHC -Wall #-}
 module Main where
-import Redmine.Get
 import Redmine.Manager
 import Redmine.Types
-import Redmine.Reporter
 import Redmine.Utils
-import Redmine.Reporter.Config    
-import qualified Data.Map as Map (fromList, empty, (!), lookup, Map)
+import Redmine.Reporter.Config
+import Data.Maybe (fromJust, isJust)
+import Control.Monad (join)
+import qualified Data.Map as Map (fromList, empty, lookup, Map)
 import Control.Monad.Trans.Maybe
-import Control.Monad (join, forM)
-import qualified Text.PrettyPrint as PP (render)
-import Data.Maybe (isJust, fromJust)
-import Data.Either (either)
-import Redmine.Reporter.Parser
-import Data.Graph (topSort)
 
-import Control.Exception
-import qualified Data.List as L (find, groupBy, sort, sortBy)
-import Data.Ord (compare)
+import qualified Text.PrettyPrint as PP
+
+import Redmine.Reporter.Parser
+import Redmine.Reporter
+import Redmine.Rest
+import Redmine.Post
+import Redmine.Get
+
+import qualified Data.List as L (find, groupBy, sortBy)
 import System.Environment (getArgs)
 
-import Debug.Trace (trace)
+--import Debug.Trace (trace)
 
 import Data.ByteString.UTF8 (fromString)
 
 
-emptyParamSet = Map.empty
-defaultConfigFile = "test.txt"
+--emptyParamSet = Map.empty
+defaultConfigFile :: FilePath
+defaultConfigFile = "test.txt" 
 
 
+issueWithJournal :: Redmine.Rest.ParamRest
 issueWithJournal = Map.fromList [("include","journals")]
-allIssues        = Map.fromList [("status_id","*"), ("project_id", "testproject"), ("sort","issue_id:desc")]
+allIssues :: Redmine.Rest.ParamRest
+allIssues = Map.fromList [("status_id","*"), ("project_id", "testproject"), ("sort","issue_id:desc")]
 
+defaultArgs :: [String]
 defaultArgs = ["2015-03-21T00:00:00Z", "2015-03-25T00:00:00Z"]
+timeExtention :: String
 timeExtention = "T00:00:00Z"
 
-defaultConfig = Config [] [] :: Config (String, String) String (Integer, String) Integer
+defaultConfig :: Config (String, String) String (Integer, String) Integer (String, [Integer])
+defaultConfig = Config [] []
 
 
 mkArgs args = case length args of
@@ -57,15 +65,26 @@ main  = do
 
       rm = RedmineMngWithAuth url user password
 
-      ud = L.find (\(SectionDef n _ _ ) -> n == "tracker") sects
+      ud = findSection "tracker" sects
+      pj = findSection "project" sects
+      
+      pjid = getId "id" $ findSection "project" sects
+      trid = getId "id" $ findSection "tracker" sects       
       
       cf = fmap (\ud -> mkConfigMap ud) ud
       (trackerIdMap, trackerOrderMap) = case cf of
         Just (_, i, o) -> (i, o)
         Nothing            -> (Map.empty, Map.empty)
+  print (pjid, trid)
+{-      issue = Issue { project_Issue = ObjRef {id_ObjRef = 1}, tracker_Issue = ObjRef 1 "",
+                      subject_Issue = "This is a Test.", description_Issue = "", journals_Issue = Just []}
+  is <- runMaybeT $ postIssue rm issue
+  return is-}
 
   is <- (runMaybeT $ getIssues rm allIssues)
-  let mbiids = fmap (map id_Issue) is
+  let mbiids = fmap (map id_Issue . filter (isTargetIssue pjid trid Nothing)) is
+      mbiids' = fmap (map id_Issue) is
+  print trid
   js <- case mbiids of
     Just iids -> do
          a <- mapM (\i -> runMaybeT $ getIssue rm i issueWithJournal) iids
@@ -84,4 +103,5 @@ main  = do
   case b of
     Just x -> putStrLn x
     Nothing -> putStr "failed"
+
 

@@ -1,30 +1,32 @@
 {-# LANGUAGE DataKinds #-}
-module Redmine.Reporter.Config (mkConfigMap, Config(..), SectionDef(..), OrderMap, IdMap) where
 
+module Redmine.Reporter.Config (mkConfigMap, findSection, getId, Config(..), SectionDef(..), OrderMap, IdMap) where
+
+import Control.Monad (join)
 import Control.Exception (bracket, catch, SomeException)
 import System.IO (hClose, hGetContents, openFile,  IOMode(..))
 import Data.Maybe (maybe)
+import qualified Data.List as L
 
 import Data.Graph (buildG, topSort, Graph, Vertex)
 
 import qualified Data.Map as Map
 
-data Config kv n a b = Config {keyValue::[kv], sections:: [(SectionDef n a b)]} deriving(Show, Eq)
-data SectionDef n a b = SectionDef{name::n, defs::[a], orders::[[b]]} deriving(Show, Eq)
+data Config kv n a b c = Config {keyValue::[kv], sections:: [(SectionDef n a b c)]} deriving(Show, Eq)
+data SectionDef n a b c = SectionDef{name::n, ids::[c], defs::[a], orders::[[b]]} deriving(Show, Eq)
 
 
-type IdMap a b= Map.Map a b
-type OrderMap a b= Map.Map a b
---readConfig:: FilePath -> IO Config
---readConfig f = bracket (openFile f ReadMode) hClose (\h -> hGetContents h >>= return . parseConfig )
+type IdMap a b = Map.Map a b
+type OrderMap a b = Map.Map a b
 
---mkConfigMap :: SectionDef a b c -> (String, IdMap, OrderMap)
-mkConfigMap (SectionDef n defs ords) = (n, idm, odm)
+findSection nm = L.find(\(SectionDef n _ _ _) -> n == nm)
+getId nm = join . fmap (lookup nm . ids)
+
+--mkConfigMap:: SectionDef t1 (a1, b) a t -> (t1, IdMap a1 b, OrderMap Int Int)
+mkConfigMap (SectionDef n _ defs ords) = (n, idm, odm)
   where
     idm = mkIdMap defs
     odm = mkOrderMap ords
-
-
 
 mkIdMap::(Integral a) => [(a, b)] -> IdMap a b
 mkIdMap dfs = Map.fromList $ map (\(f, s) -> (fromIntegral f, s)) dfs

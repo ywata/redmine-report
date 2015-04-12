@@ -2,15 +2,18 @@ password="bitnami"
 user="user"
 url="http://10.0.1.11/"
 
+[project]
+id = (1)
+
+[user]
+id=(1,2,3)
+
 [tracker]
+id = (1,2,3,4)
 "バグ"<=1
 "仕様"<=2
 "サポート"<=3
 "タスク"<=4
 3<1<4<2
-
-
-
-
 
 
