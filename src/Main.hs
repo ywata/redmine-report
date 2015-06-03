@@ -62,9 +62,8 @@ main  = do
       user     = maybe "" fromString $ lookup "user" kv
       password = maybe "" fromString $ lookup "password" kv
       url      = maybe "" fromString $ lookup "url" kv
-
       rm = RedmineMngWithAuth url user password
-
+      
       ud = findSection "tracker" sects
       pj = findSection "project" sects
       
@@ -79,13 +78,17 @@ main  = do
                       subject_Issue = "This is a Test.", description_Issue = "", journals_Issue = Just []}
   is <- runMaybeT $ postIssue rm issue
   return is-}
+  trks <- runMaybeT $ getTrackers rm
+--  prjs <- runMaybeT $ getProjects rm
+
+  print trks
 
   is <- (runMaybeT $ getIssues rm allIssues)
-  let mbiids = fmap (map id_Issue . filter (isTargetIssue pjid trid Nothing)) is
+  let mbiids = fmap (map id_Issue . filter (isTargetIssue pjid trid Nothing)) is -- drop unnecessary issues
   js <- case mbiids of
     Just iids -> do
-         a <- mapM (\i -> runMaybeT $ getIssue rm i issueWithJournal) iids
-         return $ Just a
+      a <- mapM (\i -> runMaybeT $ getIssue rm i issueWithJournal) iids
+      return $ Just a
     Nothing -> return Nothing
   let ass = fmap (L.groupBy eq . L.sortBy (cmp trackerOrderMap) . map (modifyIssue trackerIdMap) . map fromJust . filter isJust) js
       b = fmap (PP.render . toDoc from to . map Group ) ass
